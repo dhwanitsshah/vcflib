@@ -4,12 +4,12 @@
 #include "split.h"
 #include <set>
 #include <getopt.h>
-#include "fastahack/Fasta.h"
+#include "Fasta.h"
 #include <iostream>
 #include <fstream>
 
 using namespace std;
-using namespace vcf;
+using namespace vcflib;
 
 #define ALLELE_NULL -1
 
@@ -67,7 +67,8 @@ void printSummary(char** argv) {
          << "    -p, --prefix PREFIX     Affix this output prefix to each file, none by default" << endl
          << "    -P, --default-ploidy N  Set a default ploidy for samples which do not have information in the first record (2)." << endl
          << endl
-         << "Outputs sample_seq:N.fa for each sample, reference sequence, and chromosomal copy N in [0,1... ploidy]." << endl;
+         << "Outputs sample_seq:N.fa for each sample, reference sequence, and chromosomal copy N in [0,1... ploidy]." << endl
+         << "Each sequence in the fasta file is named using the same pattern used for the file name, allowing them to be combined." << endl;
         //<< "Impossible regions of haplotypes are noted with an error message.  The corresponding" << endl
         //<< "regions of the output FASTA files will be marked as N." << endl
     exit(0);
@@ -96,18 +97,19 @@ void initOutputs(map<string, map<int, SampleFastaFile*> >& outputs, vector<strin
         map<int, SampleFastaFile*>& outs = outputs[*s];
         int p = ploidies[*s];
         for (int i = 0; i < p; ++i) {
-            string name = prefix + *s + "_" + seqName + ":" + convert(i) + ".fasta";
+            string thisSeqName = *s + "_" + seqName + ":" + convert(i);
+            string fileName = prefix + thisSeqName + ".fa";
             if (!outs[i]) {
                 SampleFastaFile* fp = new SampleFastaFile;
                 outs[i] = fp;
             }
             SampleFastaFile& f = *outs[i];
-            f.open(name, seqName);
+            f.open(fileName, thisSeqName);
         }
     }
 }
 
-void vcf2fasta(VariantCallFile& variantFile, FastaReference& reference, string& outputPrefix, int defaultPloidy) {
+void vcf2fasta(VariantCallFile& variantFile, FastaReference& reference, string& outputPrefix, int defaultPloidy, string& nullAlleleString) {
     string lastSeq;
     long int lastPos=0, lastEnd=0;
     map<string, map<int, SampleFastaFile*> > outputs;
@@ -161,7 +163,18 @@ void vcf2fasta(VariantCallFile& variantFile, FastaReference& reference, string& 
             }
             int i = 0;
             for (vector<int>::iterator g = gt.begin(); g != gt.end(); ++g, ++i) {
-                outputs[sample].at(i)->write(ref5prime+var.alleles.at(*g));
+                // @TCC handle uncalled genotypes (*g == NULL_ALLELE)
+                if( *g == NULL_ALLELE ){
+                    if( nullAlleleString == "" ){
+                        cerr << "empty genotype call for sample " << *s << " at " << var.sequenceName << ":" << var.position << endl;
+                        cerr << "use -n option to set value to output for missing calls" << endl; 
+                        exit(1);
+                    }else{
+                        outputs[sample].at(i)->write(nullAlleleString);
+                    }
+                }else{
+                    outputs[sample].at(i)->write(ref5prime+var.alleles.at(*g));
+                }
             }
         }
         lastPos = var.position - 1;
@@ -187,6 +200,7 @@ int main(int argc, char** argv) {
     string fastaFileName;
     int defaultPloidy;
     string outputPrefix;
+    string nullAlleleString;
 
     int c;
     while (true) {
@@ -198,12 +212,13 @@ int main(int argc, char** argv) {
                 {"reference", required_argument, 0, 'f'},
                 {"prefix", required_argument, 0, 'p'},
                 {"default-ploidy", required_argument, 0, 'P'},
+                {"no-call-string", required_argument, 0, 'n'},
                 {0, 0, 0, 0}
             };
         /* getopt_long stores the option index here. */
         int option_index = 0;
 
-        c = getopt_long (argc, argv, "hmf:p:P:",
+        c = getopt_long (argc, argv, "hmf:p:P:n:",
                          long_options, &option_index);
 
         if (c == -1)
@@ -225,6 +240,10 @@ int main(int argc, char** argv) {
 
         case 'P':
             defaultPloidy = atoi(optarg);
+            break;
+
+	    case 'n':
+            nullAlleleString = optarg;
             break;
 
         case '?':
@@ -256,7 +275,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    vcf2fasta(variantFile, reference, outputPrefix, defaultPloidy);
+    vcf2fasta(variantFile, reference, outputPrefix, defaultPloidy, nullAlleleString);
 
     return 0;
 

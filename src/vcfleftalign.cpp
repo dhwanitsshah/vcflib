@@ -2,14 +2,14 @@
 #include "convert.h"
 #include "join.h"
 #include "split.h"
-#include "fastahack/Fasta.h"
+#include "Fasta.h"
 #include <set>
 #include <vector>
 #include <getopt.h>
 #include <cmath>
 
 using namespace std;
-using namespace vcf;
+using namespace vcflib;
 
 
 // Attempts to left-realign all the indels represented by the alignment cigar.

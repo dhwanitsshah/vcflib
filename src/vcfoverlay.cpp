@@ -1,8 +1,10 @@
 #include "Variant.h"
 #include <getopt.h>
+#include "gpatInfo.hpp"
+
 
 using namespace std;
-using namespace vcf;
+using namespace vcflib;
 
 
 void printSummary(char** argv) {
@@ -10,7 +12,8 @@ void printSummary(char** argv) {
          << endl
          << "options:" << endl 
          << "    -h, --help       this dialog" << endl
-         << endl
+	 << "    -v, --version    prints version" << endl
+	 << endl
          << "Overlays records in the input vcf files in the order in which they appear." << endl;
     exit(0);
 }
@@ -22,32 +25,40 @@ int main(int argc, char** argv) {
 
     int c;
     while (true) {
-        static struct option long_options[] =
-            {
-                {"help", no_argument, 0, 'h'},
-                {0, 0, 0, 0}
-            };
-        int option_index = 0;
-
-        c = getopt_long (argc, argv, "h",
-                         long_options, &option_index);
-
-        if (c == -1)
-            break;
-
-        switch (c) {
-            case 'h':
-                printSummary(argv);
-                break;
-
-            case '?':
-                printSummary(argv);
-                exit(1);
-                break;
-
-            default:
-                abort ();
-        }
+      static struct option long_options[] =
+	{
+	  {"help", no_argument, 0, 'h'},
+	  {"version", no_argument, 0, 'v'},
+	  {0, 0, 0, 0}
+	};
+      int option_index = 0;
+      
+      c = getopt_long (argc, argv, "hv",
+		       long_options, &option_index);
+      
+      if (c == -1){
+	break;
+      }
+      switch (c) {
+      case 'h':
+	{
+	  printSummary(argv);
+	  break;
+	}
+      case 'v':
+	{
+	  printBasicVersion();
+	  exit(0);
+	} 
+      case '?':
+	{
+	  printSummary(argv);
+	  exit(1);
+	  break;
+	}
+      default:
+	abort ();
+      }
     }
 
     // idea here is to shadow-merge
@@ -58,7 +69,7 @@ int main(int argc, char** argv) {
     int i = optind;
 
     if (!(optind < argc - 1)) {
-        cerr << "no input files specified" << endl;
+        cerr << "more than one input file must be specified" << endl;
         exit(1);
     }
 
@@ -68,17 +79,20 @@ int main(int argc, char** argv) {
 	    Variant& var = variantFiles[index].second;
 	    string inputFilename = argv[optind++];
 	    variantFile = new VariantCallFile;
-	    variantFile->open(inputFilename);
-	    var.setVariantCallFile(variantFile);
-	    if (!variantFile->is_open()) {
-            cout << "could not open VCF file" << endl;
-            exit(1);
-	    } else {
-            while (variantFile->getNextVariant(var)) {
-                linesByPrecedence[var.sequenceName][var.position][var.vrepr()][index] = variantFile->line;
+        try {
+            if (!variantFile->open(inputFilename)) {
+                cerr << "vcfoverlay could not open VCF file " << inputFilename << endl;
+                --index;
+            } else {
+                var.setVariantCallFile(variantFile);
+                while (variantFile->getNextVariant(var)) {
+                    linesByPrecedence[var.sequenceName][var.position][var.vrepr()][index] = variantFile->line;
+                }
             }
-	    }
-	}
+        } catch (...) {
+            cerr << "vcfoverlay encountered errors when opening " << inputFilename << endl;
+        }
+    }
     
     cout << variantFiles.begin()->second.first->header << endl;
 

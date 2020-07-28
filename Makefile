@@ -1,159 +1,37 @@
-#OBJ_DIR = ./
-HEADERS = src/Variant.h \
-		  src/split.h \
-		  src/join.h
-SOURCES = src/Variant.cpp \
-		  src/split.cpp
-OBJECTS= $(SOURCES:.cpp=.o)
+VCF_LIB_LOCAL:=$(shell pwd)
+BUILD_DIR:=$(VCF_LIB_LOCAL)/build
+BIN_DIR:=$(VCF_LIB_LOCAL)/bin
+LIB_DIR:=$(VCF_LIB_LOCAL)/lib
+INC_DIR:=$(VCF_LIB_LOCAL)/include
+CMAKE_FLAGS?=
 
-# TODO
-#vcfstats.cpp
-
-BIN_SOURCES = src/vcfecho.cpp \
-			  src/vcfaltcount.cpp \
-			  src/vcfhetcount.cpp \
-			  src/vcfhethomratio.cpp \
-			  src/vcffilter.cpp \
-			  src/vcf2tsv.cpp \
-			  src/vcfgenotypes.cpp \
-			  src/vcfannotategenotypes.cpp \
-			  src/vcfcommonsamples.cpp \
-			  src/vcfremovesamples.cpp \
-			  src/vcfkeepsamples.cpp \
-			  src/vcfsamplenames.cpp \
-			  src/vcfgenotypecompare.cpp \
-			  src/vcffixup.cpp \
-			  src/vcfclassify.cpp \
-			  src/vcfsamplediff.cpp \
-			  src/vcfremoveaberrantgenotypes.cpp \
-			  src/vcfrandom.cpp \
-			  src/vcfparsealts.cpp \
-			  src/vcfstats.cpp \
-			  src/vcfflatten.cpp \
-			  src/vcfprimers.cpp \
-			  src/vcfnumalt.cpp \
-			  src/vcfcleancomplex.cpp \
-			  src/vcfintersect.cpp \
-			  src/vcfannotate.cpp \
-			  src/vcfallelicprimitives.cpp \
-			  src/vcfoverlay.cpp \
-			  src/vcfaddinfo.cpp \
-			  src/vcfkeepinfo.cpp \
-			  src/vcfkeepgeno.cpp \
-			  src/vcfafpath.cpp \
-			  src/vcfcountalleles.cpp \
-			  src/vcflength.cpp \
-			  src/vcfdistance.cpp \
-			  src/vcfrandomsample.cpp \
-			  src/vcfentropy.cpp \
-			  src/vcfglxgt.cpp \
-			  src/vcfroc.cpp \
-			  src/vcfsom.cpp \
-			  src/vcfcheck.cpp \
-			  src/vcfstreamsort.cpp \
-			  src/vcfuniq.cpp \
-			  src/vcfuniqalleles.cpp \
-			  src/vcfremap.cpp \
-			  src/vcf2fasta.cpp \
-			  src/vcfsitesummarize.cpp \
-			  src/vcfbreakmulti.cpp \
-			  src/vcfcreatemulti.cpp \
-			  src/vcfevenregions.cpp \
-			  src/vcfcat.cpp \
-			  src/vcfgenosummarize.cpp \
-			  src/vcfgenosamplenames.cpp \
-			  src/vcfgeno2haplo.cpp \
-			  src/vcfleftalign.cpp \
-			  src/vcfcombine.cpp \
-			  src/vcfgeno2alleles.cpp \
-			  src/vcfindex.cpp \
-			  src/vcfsample2info.cpp \
-			  src/vcfqual2info.cpp \
-			  src/vcfglbound.cpp \
-			  src/vcfinfosummarize.cpp \
-
-#BINS = $(BIN_SOURCES:.cpp=)
-BINS = $(addprefix bin/,$(notdir $(BIN_SOURCES:.cpp=)))
-SHORTBINS = $(notdir $(BIN_SOURCES:.cpp=))
-
-TABIX = tabixpp/tabix.o
-
-FASTAHACK = fastahack/Fasta.o
-
-SMITHWATERMAN = smithwaterman/SmithWatermanGotoh.o 
-
-REPEATS = smithwaterman/Repeats.o
-
-INDELALLELE = smithwaterman/IndelAllele.o
-
-DISORDER = smithwaterman/disorder.c
-
-LEFTALIGN = smithwaterman/LeftAlign.o
-
-FSOM = fsom/fsom.o
-
-FILEVERCMP = filevercmp/filevercmp.o
-
-INCLUDES = -I. -L. -Ltabixpp/ -ltabix -lz -lm
-
-all: $(OBJECTS) $(BINS)
-
-CXX = g++
-CXXFLAGS = -O3 -D_FILE_OFFSET_BITS=64
-#CXXFLAGS = -O2
-#CXXFLAGS = -pedantic -Wall -Wshadow -Wpointer-arith -Wcast-qual
-
-SSW = src/ssw.o src/ssw_cpp.o
-
-ssw.o: src/ssw.h
-ssw_cpp.o:src/ssw_cpp.h
+all: 
+	if [ ! -d $(BUILD_DIR) ]; then mkdir -p $(BUILD_DIR); fi
+	cd $(BUILD_DIR); \
+		cmake $(CMAKE_FLAGS) -DCMAKE_INSTALL_PREFIX=$(VCF_LIB_LOCAL) $(VCF_LIB_LOCAL); \
+		$(MAKE) && $(MAKE) install
 
 openmp:
-	$(MAKE) CXXFLAGS="$(CXXFLAGS) -fopenmp -D HAS_OPENMP"
+	CMAKE_FLAGS=-DOPENMP=ON $(MAKE) all
 
 profiling:
-	$(MAKE) CXXFLAGS="$(CXXFLAGS) -g" all
+	CMAKE_FLAGS=-DPROFILING=ON $(MAKE) all
 
 gprof:
-	$(MAKE) CXXFLAGS="$(CXXFLAGS) -pg" all
+	CMAKE_FLAGS=-DGPROF=ON $(MAKE) all
 
-$(OBJECTS): $(SOURCES) $(HEADERS) $(TABIX)
-	$(CXX) -c -o $@ src/$(*F).cpp $(INCLUDES) $(LDFLAGS) $(CXXFLAGS)
+test: $(BINS)
+	@prove -Itests/lib -w tests/*.t
 
-$(TABIX):
-	cd tabixpp && $(MAKE)
+pull:
+	git pull
 
-$(SMITHWATERMAN):
-	cd smithwaterman && $(MAKE)
-
-$(DISORDER): $(SMITHWATERMAN)
-
-$(REPEATS): $(SMITHWATERMAN)
-
-$(LEFTALIGN): $(SMITHWATERMAN)
-
-$(INDELALLELE): $(SMITHWATERMAN)
-
-$(FASTAHACK):
-	cd fastahack && $(MAKE)
-
-$(FSOM):
-	cd fsom && $(CXX) $(CXXFLAGS) -c fsom.c -lm
-
-$(FILEVERCMP):
-	cd filevercmp && make
-
-$(SHORTBINS):
-	$(MAKE) bin/$@
-
-$(BINS): $(BIN_SOURCES) $(OBJECTS) $(SMITHWATERMAN) $(FASTAHACK) $(DISORDER) $(LEFTALIGN) $(INDELALLELE) $(SSW) $(FSOM) $(FILEVERCMP)
-	$(CXX) $(OBJECTS) $(SMITHWATERMAN) $(REPEATS) $(DISORDER) $(LEFTALIGN) $(INDELALLELE) $(SSW) $(FASTAHACK) $(FSOM) $(FILEVERCMP) tabixpp/tabix.o tabixpp/bgzf.o src/$(notdir $@).cpp -o $@ $(INCLUDES) $(LDFLAGS) $(CXXFLAGS)
+update: pull all
 
 clean:
 	rm -f $(BINS) $(OBJECTS)
-	rm -f ssw_cpp.o ssw.o
-	cd tabixpp && make clean
-	cd smithwaterman && make clean
-	cd fastahack && make clean
+	rm -rf $(BIN_DIR)
+	rm -rf $(LIB_DIR)
+	rm -rf $(INC_DIR)
 
-.PHONY: clean all
+.PHONY: clean all test pre

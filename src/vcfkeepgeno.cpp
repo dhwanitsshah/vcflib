@@ -5,14 +5,14 @@
 #include <set>
 
 using namespace std;
-using namespace vcf;
+using namespace vcflib;
 
 
 int main(int argc, char** argv) {
 
     if (argc < 3) {
         cerr << "usage: " << argv[0] << " <vcf file> [FIELD1] [FIELD2] ..." << endl
-             << "outputs each record in the vcf file, removing FORMAT fields not listed"
+             << "outputs each record in the vcf file, removing FORMAT fields not listed "
 	     << "on the command line from sample specifications in the output"
 	     << endl;
         return 1;

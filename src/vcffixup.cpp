@@ -5,7 +5,7 @@
 #include <iostream>
 
 using namespace std;
-using namespace vcf;
+using namespace vcflib;
 
 int countAlts(Variant& var, int alleleIndex) {
     int alts = 0;
@@ -43,14 +43,14 @@ int countAlleles(Variant& var) {
 
 int main(int argc, char** argv) {
 
-    if (argc > 1 && (argv[1] == "-h" || argv[1] == "--help")) {
+  if (argc == 1 || ((argc > 1) && strcmp(argv[1], "-h") == 0) || strcmp(argv[1], "--help") == 0) {
         cerr << "usage: " << argv[0] << " <vcf file>" << endl
              << "outputs a VCF stream where AC and NS have been generated for each record using sample genotypes" << endl;
         return 1;
     }
 
     VariantCallFile variantFile;
-    if (argc == 1 || (argc == 2 && argv[1] == "-")) {
+    if (argc == 1 || ((argc == 2) && strcmp(argv[1], "-") == 0)) {
         variantFile.open(std::cin);
         if (!variantFile.is_open()) {
             cerr << "vcffixup: could not open stdin" << endl;
@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
 
     // write the new header
     cout << variantFile.header << endl;
- 
+
     // print the records, filtering is done via the setting of varA's output sample names
     while (variantFile.getNextVariant(var)) {
         stringstream ns;
@@ -105,7 +105,9 @@ int main(int argc, char** argv) {
             ac << altcount;
             var.info["AC"].push_back(ac.str());
             stringstream af;
-            af << (double) altcount / (double) allelecount;
+            double faf = (double) altcount / (double) allelecount;
+            if(faf != faf) faf = 0;
+            af << faf;
             var.info["AF"].push_back(af.str());
         }
         cout << var << endl;
